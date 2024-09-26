@@ -1,4 +1,4 @@
-# arka-zk-prover
+# Arka-zk-prover
 
 ZK prover for agents
 
