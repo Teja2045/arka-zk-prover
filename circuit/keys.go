@@ -10,8 +10,17 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
+	bn254 "github.com/consensys/gnark/backend/groth16/bn254"
+	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
+)
+
+// Define filenames
+const (
+	ProverKeyfileName = "./keys/prover"
+	VerifierfileName  = "./keys/verifier"
+	Csfilename        = "./keys/ccs"
 )
 
 func GenerateZKKeys() error {
@@ -40,21 +49,16 @@ func GenerateZKKeys() error {
 	vk.WriteTo(vkBuf)
 	ccs.WriteTo(ccsBuf)
 
-	// Define filenames
-	proverKeyfileName := "./keys/prover"
-	verifierfileName := "./keys/verifier"
-	ccsfilename := "./keys/ccs"
-
 	// Write keys and constraint system to files
-	err = WriteToFile(proverKeyfileName, pkBuf)
+	err = WriteToFile(ProverKeyfileName, pkBuf)
 	if err != nil {
 		return err
 	}
-	err = WriteToFile(verifierfileName, vkBuf)
+	err = WriteToFile(VerifierfileName, vkBuf)
 	if err != nil {
 		return err
 	}
-	err = WriteToFile(ccsfilename, ccsBuf)
+	err = WriteToFile(Csfilename, ccsBuf)
 	if err != nil {
 		return err
 	}
@@ -81,4 +85,52 @@ func WriteToFile(filename string, dataBuf *bytes.Buffer) error {
 	}
 
 	return nil
+}
+
+// read the cs stored in the file and return it
+func GetContraintSystem() (constraint.ConstraintSystem, error) {
+	csBytes, err := os.ReadFile(Csfilename)
+	if err != nil {
+		return nil, err
+	}
+
+	cs := groth16.NewCS(ecc.BN254)
+	_, err = cs.ReadFrom(bytes.NewBuffer(csBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	return cs, nil
+}
+
+// read the prover key stored in the file and return it
+func GetProverKey() (groth16.ProvingKey, error) {
+	pkBytes, err := os.ReadFile(ProverKeyfileName)
+	if err != nil {
+		return nil, err
+	}
+
+	pk := new(bn254.ProvingKey)
+	_, err = pk.ReadFrom(bytes.NewBuffer(pkBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	return pk, nil
+}
+
+// read the verifier key stored in the file and return it
+func GetVerifierKey() (groth16.VerifyingKey, error) {
+	vkBytes, err := os.ReadFile(VerifierfileName)
+	if err != nil {
+		return nil, err
+	}
+
+	vk := new(bn254.VerifyingKey)
+	_, err = vk.ReadFrom(bytes.NewBuffer(vkBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	return vk, nil
 }

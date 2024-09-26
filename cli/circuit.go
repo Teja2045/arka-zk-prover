@@ -7,7 +7,6 @@ import (
 	"log"
 
 	zkprover "github.com/arka-labs/zk-prover"
-	"github.com/arka-labs/zk-prover/circuit"
 )
 
 func main() {
@@ -28,5 +27,4 @@ func main() {
 		fmt.Println("circuit.go successfully extracted and placed in the circuit directory")
 	}
 
-	circuit.GenerateZKKeys()
 }
