@@ -3,6 +3,7 @@ package circuit
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 
 	"log/slog"
 	"os"
@@ -24,33 +25,60 @@ func GenerateZKKeys() error {
 	var circuit Circuit
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintln("error while compiling circuit: ", err))
-	}
-	pk, vk, err := groth16.Setup(ccs)
-	if err != nil {
-		return fmt.Errorf(fmt.Sprintln("error while circuit setup", err))
+		return fmt.Errorf("error while compiling circuit: %v", err)
 	}
 
+	// Generate prover key and verifier key using groth16
+	pk, vk, err := groth16.Setup(ccs)
+	if err != nil {
+		return fmt.Errorf("error during circuit setup: %v", err)
+	}
+
+	// Prepare buffers for keys and constraint system
 	vkBuf, pkBuf, ccsBuf := new(bytes.Buffer), new(bytes.Buffer), new(bytes.Buffer)
 	pk.WriteTo(pkBuf)
 	vk.WriteTo(vkBuf)
 	ccs.WriteTo(ccsBuf)
 
-	proverKeyfileName := fmt.Sprintf("../keys/prover")
-	WriteToFile(proverKeyfileName, pkBuf)
+	// Define filenames
+	proverKeyfileName := "./keys/prover"
+	verifierfileName := "./keys/verifier"
+	ccsfilename := "./keys/ccs"
 
-	verifierfileName := fmt.Sprintf("../keys/verifier")
-	WriteToFile(verifierfileName, vkBuf)
+	// Write keys and constraint system to files
+	err = WriteToFile(proverKeyfileName, pkBuf)
+	if err != nil {
+		return err
+	}
+	err = WriteToFile(verifierfileName, vkBuf)
+	if err != nil {
+		return err
+	}
+	err = WriteToFile(ccsfilename, ccsBuf)
+	if err != nil {
+		return err
+	}
 
-	ccsfilename := fmt.Sprintf("../keys/ccs")
-	WriteToFile(ccsfilename, ccsBuf)
-
-	slog.Info("Keys are successfully generated and stored in {keys} folder")
-
+	slog.Info("Keys are successfully generated and stored in the {keys} folder")
 	return nil
-
 }
 
-func WriteToFile(filename string, dataBuf *bytes.Buffer) {
-	os.WriteFile(filename, dataBuf.Bytes(), 0666)
+// WriteToFile creates the directory if necessary and writes the buffer content to the specified file.
+func WriteToFile(filename string, dataBuf *bytes.Buffer) error {
+	// Extract directory path from the filename
+	dir := filepath.Dir(filename)
+
+	// Create directory if it doesn't exist
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", dir, err)
+	}
+
+	// Write data to file
+	err = os.WriteFile(filename, dataBuf.Bytes(), 0666)
+	if err != nil {
+		return fmt.Errorf("failed to write file %s: %v", filename, err)
+	}
+
+	return nil
 }
