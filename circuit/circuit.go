@@ -1,8 +1,6 @@
 package circuit
 
 import (
-	"fmt"
-
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/backend/witness"
@@ -11,6 +9,12 @@ import (
 )
 
 const INPUTS_SIZE = 3
+
+type CircuitInputs struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+	Z int `json:"z"`
+}
 
 type Circuit struct {
 	X frontend.Variable `gnark:",public"`
@@ -23,18 +27,16 @@ func (circuit *Circuit) Define(api frontend.API) error {
 	return nil
 }
 
-func GenerateZKProof(cs constraint.ConstraintSystem, pk groth16.ProvingKey, inputs ...any) (groth16.Proof, witness.Witness, error) {
+func GenerateZKProof(cs constraint.ConstraintSystem, pk groth16.ProvingKey, customInputs any) (groth16.Proof, witness.Witness, error) {
 
-	if len(inputs) != INPUTS_SIZE {
-		fmt.Println(inputs[0])
-		return nil, nil, fmt.Errorf("not enough inputs for the circuit: have %d, expected %d", len(inputs), INPUTS_SIZE)
-	}
+	circuitInputs := customInputs.(CircuitInputs)
+
 	// TODO: just change this
 	// contruct assignment using dynamic veriables
 	assignment := Circuit{
-		X: inputs[0],
-		Y: inputs[1],
-		Z: inputs[2],
+		X: circuitInputs.X,
+		Y: circuitInputs.Y,
+		Z: circuitInputs.Z,
 	}
 
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())

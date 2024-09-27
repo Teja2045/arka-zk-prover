@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/arka-labs/zk-prover/circuit"
-	"github.com/consensys/gnark/backend/groth16"
-	"github.com/consensys/gnark/backend/witness"
 )
 
 // GenerateCircuitFromRemoteURL downloads a zip file from the given URL, extracts the "circuit.go" file,
@@ -96,19 +94,25 @@ func GenerateCircuit(r *zip.ReadCloser, destDir string) error {
 	return fmt.Errorf("circuit.go not found in the zip archive")
 }
 
-func GenerateKeys() error {
-	return circuit.GenerateZKKeys()
+func GenerateKeys(dir string) error {
+	return circuit.GenerateZKKeys(dir)
 }
 
-func GetZKProof(inputs ...any) (groth16.Proof, witness.Witness, error) {
-	cs, err := circuit.GetContraintSystem()
+func GetZKProof(inputs any, dir string) (ZKValidityProof, error) {
+	cs, err := circuit.GetContraintSystem(dir)
 	if err != nil {
-		return nil, nil, err
+		return ZKValidityProof{}, err
 	}
 
-	pk, err := circuit.GetProverKey()
+	pk, err := circuit.GetProverKey(dir)
 	if err != nil {
-		return nil, nil, err
+		return ZKValidityProof{}, err
 	}
-	return circuit.GenerateZKProof(cs, pk, inputs...)
+	zkProof, publicWitness, err := circuit.GenerateZKProof(cs, pk, inputs)
+	if err != nil {
+		return ZKValidityProof{}, err
+	}
+
+	return NewZKValidityProof(zkProof, publicWitness)
+
 }

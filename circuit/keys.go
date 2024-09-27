@@ -18,12 +18,28 @@ import (
 
 // Define filenames
 const (
-	ProverKeyfileName = "./keys/prover"
-	VerifierfileName  = "./keys/verifier"
-	Csfilename        = "./keys/ccs"
+	ProverKeyfileName = "prover"
+	VerifierfileName  = "verifier"
+	Csfilename        = "ccs"
 )
 
-func GenerateZKKeys() error {
+func ProverKeyPath(dir string) string {
+	return dir + "/" + ProverKeyfileName
+}
+
+func VerifierKeyPath(dir string) string {
+	return dir + "/" + VerifierfileName
+}
+
+func CsPath(dir string) string {
+	return dir + "/" + Csfilename
+}
+
+func GenerateZKKeys(dir string) error {
+
+	proverKeyPath := ProverKeyPath(dir)
+	verifierKeyPath := VerifierKeyPath(dir)
+	csPath := CsPath(dir)
 
 	slog.Info(
 		fmt.Sprintf(
@@ -50,15 +66,15 @@ func GenerateZKKeys() error {
 	ccs.WriteTo(ccsBuf)
 
 	// Write keys and constraint system to files
-	err = WriteToFile(ProverKeyfileName, pkBuf)
+	err = WriteToFile(proverKeyPath, pkBuf)
 	if err != nil {
 		return err
 	}
-	err = WriteToFile(VerifierfileName, vkBuf)
+	err = WriteToFile(verifierKeyPath, vkBuf)
 	if err != nil {
 		return err
 	}
-	err = WriteToFile(Csfilename, ccsBuf)
+	err = WriteToFile(csPath, ccsBuf)
 	if err != nil {
 		return err
 	}
@@ -88,8 +104,9 @@ func WriteToFile(filename string, dataBuf *bytes.Buffer) error {
 }
 
 // read the cs stored in the file and return it
-func GetContraintSystem() (constraint.ConstraintSystem, error) {
-	csBytes, err := os.ReadFile(Csfilename)
+func GetContraintSystem(dir string) (constraint.ConstraintSystem, error) {
+	csPath := CsPath(dir)
+	csBytes, err := os.ReadFile(csPath)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +120,20 @@ func GetContraintSystem() (constraint.ConstraintSystem, error) {
 	return cs, nil
 }
 
+func GetProverKeyBytes(dir string) ([]byte, error) {
+	proverKeyPath := ProverKeyPath(dir)
+	pkBytes, err := os.ReadFile(proverKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return pkBytes, nil
+}
+
 // read the prover key stored in the file and return it
-func GetProverKey() (groth16.ProvingKey, error) {
-	pkBytes, err := os.ReadFile(ProverKeyfileName)
+func GetProverKey(dir string) (groth16.ProvingKey, error) {
+	proverKeyPath := ProverKeyPath(dir)
+	pkBytes, err := os.ReadFile(proverKeyPath)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +148,9 @@ func GetProverKey() (groth16.ProvingKey, error) {
 }
 
 // read the verifier key stored in the file and return it
-func GetVerifierKey() (groth16.VerifyingKey, error) {
-	vkBytes, err := os.ReadFile(VerifierfileName)
+func GetVerifierKey(dir string) (groth16.VerifyingKey, error) {
+	verifierKeyPath := VerifierKeyPath(dir)
+	vkBytes, err := os.ReadFile(verifierKeyPath)
 	if err != nil {
 		return nil, err
 	}

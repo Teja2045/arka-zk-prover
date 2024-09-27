@@ -5,17 +5,22 @@ import (
 
 	zkprover "github.com/arka-labs/zk-prover"
 	"github.com/arka-labs/zk-prover/circuit"
-	"github.com/consensys/gnark/backend/groth16"
+)
+
+const (
+	DIR_1 = "./keys"
 )
 
 func main() {
-	zkProof, publicWitness, err := zkprover.GetZKProof(1, 2, 3)
+	var circuitInputs circuit.CircuitInputs
+
+	circuitInputs.X = 1
+	circuitInputs.Y = 2
+	circuitInputs.Z = 3
+
+	validityProof, err := zkprover.GetZKProof(circuitInputs, DIR_1)
 	if err != nil {
 		log.Fatal(err)
 	}
-	vk, err := circuit.GetVerifierKey()
-	if err != nil {
-		log.Fatal(err)
-	}
-	groth16.Verify(zkProof, vk, publicWitness)
+	validityProof.Verify(DIR_1)
 }

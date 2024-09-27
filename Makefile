@@ -1,6 +1,6 @@
 # Makefile
 
-.PHONY: all run-circuit run-keys run-proof
+.PHONY: all run-circuit run-keys run-proof start-server
 
 generate-example-circuit:
 	go run cli/circuit.go
@@ -11,3 +11,6 @@ generate-zk-keys:
 
 verify-example-proof:
 	go run cli/proof.go
+
+start-server:
+	go run cli/server.go	

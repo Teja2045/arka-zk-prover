@@ -3,13 +3,20 @@ package main
 import (
 	"archive/zip"
 	"fmt"
-
 	"log"
 
 	zkprover "github.com/arka-labs/zk-prover"
+	"github.com/arka-labs/zk-prover/server"
+)
+
+const (
+	PORT  = 8000
+	DIR_2 = "./keys"
 )
 
 func main() {
+
+	server := server.NewZKServer(8000, DIR_2)
 	// Example usage
 	zipFile := "example-circuit.zip" // Path to your zip file
 	destDir := "./"
@@ -25,5 +32,11 @@ func main() {
 		fmt.Println("Error:", err)
 	} else {
 		fmt.Println("circuit.go successfully extracted and placed in the circuit directory")
+	}
+
+	err = zkprover.GenerateKeys(server.KeysDir)
+
+	if err := server.Start(); err != nil {
+		log.Fatal(err)
 	}
 }
