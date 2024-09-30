@@ -122,12 +122,7 @@ func GetContraintSystem(dir string) (constraint.ConstraintSystem, error) {
 
 func GetProverKeyBytes(dir string) ([]byte, error) {
 	proverKeyPath := ProverKeyPath(dir)
-	pkBytes, err := os.ReadFile(proverKeyPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return pkBytes, nil
+	return os.ReadFile(proverKeyPath)
 }
 
 // read the prover key stored in the file and return it
@@ -145,6 +140,11 @@ func GetProverKey(dir string) (groth16.ProvingKey, error) {
 	}
 
 	return pk, nil
+}
+
+func GetVerifierKeyBytes(dir string) ([]byte, error) {
+	verifierKeyPath := VerifierKeyPath(dir)
+	return os.ReadFile(verifierKeyPath)
 }
 
 // read the verifier key stored in the file and return it

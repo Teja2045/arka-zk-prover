@@ -11,43 +11,27 @@ import (
 	"github.com/arka-labs/zk-prover/circuit"
 )
 
-// GenerateCircuitFromRemoteURL downloads a zip file from the given URL, extracts the "circuit.go" file,
-// and saves it to the "circuit/" directory, replacing any existing file.
-func GenerateCircuitFromRemoteURL(zipFileURL, destDir string) error {
-	// Create a temporary file to store the downloaded zip
-	tmpZipFile, err := os.CreateTemp("", "circuit-*.zip")
+func GenerateKeys(dir string) error {
+	return circuit.GenerateZKKeys(dir)
+}
+
+func GetZKProof(inputs any, dir string) (ZKValidityProof, error) {
+	cs, err := circuit.GetContraintSystem(dir)
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
+		return ZKValidityProof{}, err
 	}
-	defer os.Remove(tmpZipFile.Name()) // Clean up the temp file afterwards
-	defer tmpZipFile.Close()
 
-	// Download the zip file from the given URL
-	resp, err := http.Get(zipFileURL)
+	pk, err := circuit.GetProverKey(dir)
 	if err != nil {
-		return fmt.Errorf("failed to download zip file from URL: %v", err)
+		return ZKValidityProof{}, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download zip file, got HTTP status: %v", resp.StatusCode)
-	}
-
-	// Copy the downloaded content to the temp zip file
-	_, err = io.Copy(tmpZipFile, resp.Body)
+	zkProof, publicWitness, err := circuit.GenerateZKProof(cs, pk, inputs)
 	if err != nil {
-		return fmt.Errorf("failed to save downloaded zip content: %v", err)
+		return ZKValidityProof{}, err
 	}
 
-	// Re-open the temp file for reading as a zip
-	zipReader, err := zip.OpenReader(tmpZipFile.Name())
-	if err != nil {
-		return fmt.Errorf("failed to open downloaded zip file: %v", err)
-	}
-	defer zipReader.Close()
+	return NewZKValidityProof(zkProof, publicWitness)
 
-	// Call GenerateCircuit to extract and process the zip content
-	return GenerateCircuit(zipReader, destDir)
 }
 
 // GenerateCircuit extracts the "circuit.go" file from a zip archive and saves it to "circuit/circuit.go", replacing any existing file.
@@ -94,25 +78,41 @@ func GenerateCircuit(r *zip.ReadCloser, destDir string) error {
 	return fmt.Errorf("circuit.go not found in the zip archive")
 }
 
-func GenerateKeys(dir string) error {
-	return circuit.GenerateZKKeys(dir)
-}
-
-func GetZKProof(inputs any, dir string) (ZKValidityProof, error) {
-	cs, err := circuit.GetContraintSystem(dir)
+// GenerateCircuitFromRemoteURL downloads a zip file from the given URL, extracts the "circuit.go" file,
+// and saves it to the "circuit/" directory, replacing any existing file.
+func GenerateCircuitFromRemoteURL(zipFileURL, destDir string) error {
+	// Create a temporary file to store the downloaded zip
+	tmpZipFile, err := os.CreateTemp("", "circuit-*.zip")
 	if err != nil {
-		return ZKValidityProof{}, err
+		return fmt.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpZipFile.Name()) // Clean up the temp file afterwards
+	defer tmpZipFile.Close()
+
+	// Download the zip file from the given URL
+	resp, err := http.Get(zipFileURL)
+	if err != nil {
+		return fmt.Errorf("failed to download zip file from URL: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download zip file, got HTTP status: %v", resp.StatusCode)
 	}
 
-	pk, err := circuit.GetProverKey(dir)
+	// Copy the downloaded content to the temp zip file
+	_, err = io.Copy(tmpZipFile, resp.Body)
 	if err != nil {
-		return ZKValidityProof{}, err
-	}
-	zkProof, publicWitness, err := circuit.GenerateZKProof(cs, pk, inputs)
-	if err != nil {
-		return ZKValidityProof{}, err
+		return fmt.Errorf("failed to save downloaded zip content: %v", err)
 	}
 
-	return NewZKValidityProof(zkProof, publicWitness)
+	// Re-open the temp file for reading as a zip
+	zipReader, err := zip.OpenReader(tmpZipFile.Name())
+	if err != nil {
+		return fmt.Errorf("failed to open downloaded zip file: %v", err)
+	}
+	defer zipReader.Close()
 
+	// Call GenerateCircuit to extract and process the zip content
+	return GenerateCircuit(zipReader, destDir)
 }

@@ -12,6 +12,7 @@ import (
 
 func (server *ZKServer) Start() error {
 	http.HandleFunc("/generate-zk-proof", server.handleZKProofRequest)
+	http.HandleFunc("verifier-key", server.handleGetVerifierKeyRequest)
 
 	addr := fmt.Sprintf(":%d", server.Port)
 	log.Printf("Starting server on %s\n", addr)
@@ -39,5 +40,24 @@ func (server *ZKServer) handleZKProofRequest(w http.ResponseWriter, r *http.Requ
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+func (server *ZKServer) handleGetVerifierKeyRequest(w http.ResponseWriter, _ *http.Request) {
+	vkBytes, err := circuit.GetVerifierKeyBytes(server.KeysDir)
+	if err != nil {
+		http.Error(w, "failed to fetch verifier key", http.StatusInternalServerError)
+		return
+	}
+
+	// Set the content type to application/octet-stream or any appropriate type.
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+
+	// Write the verifier key bytes to the response
+	_, writeErr := w.Write(vkBytes)
+	if writeErr != nil {
+		http.Error(w, "failed to write verifier key", http.StatusInternalServerError)
+		return
 	}
 }
