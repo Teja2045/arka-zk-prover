@@ -18,11 +18,6 @@ import (
 	"github.com/consensys/gnark/std/permutation/sha2"
 )
 
-const (
-	DATA_SIZE = 128
-	HASH_SIZE = 32
-)
-
 // var _ hash.BinaryFixedLengthHasher = (*digest)(nil)
 // var _ hash.FieldHasher = (*digest)(nil)
 
@@ -32,8 +27,8 @@ type CircuitInputs struct {
 }
 
 type Circuit struct {
-	In       [DATA_SIZE]uints.U8
-	Expected [HASH_SIZE]uints.U8
+	In       []uints.U8
+	Expected []uints.U8
 }
 
 func (circuit *Circuit) Define(api frontend.API) error {
@@ -46,7 +41,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 	if err != nil {
 		return err
 	}
-	hFunc.Write(circuit.In[:])
+	hFunc.Write(circuit.In)
 	hash := hFunc.Sum()
 	if len(hash) != 32 {
 		return fmt.Errorf("not 32 bytes")
@@ -62,20 +57,10 @@ func GenerateZKProof(cs constraint.ConstraintSystem, pk groth16.ProvingKey, cust
 
 	circuitInputs := customInputs.(CircuitInputs)
 
-	resizedData := FixedSizeBytes(circuitInputs.Data)
-	uintsData := uints.NewU8Array(resizedData[:])
-	uintsHash := uints.NewU8Array(circuitInputs.Hash[:])
-
-	var input [DATA_SIZE]uints.U8
-	copy(input[:], uintsData)
-
-	var output [HASH_SIZE]uints.U8
-	copy(output[:], uintsHash)
-
 	// contruct assignment using dynamic veriables
 	assignment := Circuit{
-		In:       input,
-		Expected: output,
+		In:       uints.NewU8Array(circuitInputs.Data),
+		Expected: uints.NewU8Array(circuitInputs.Hash[:]),
 	}
 
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
@@ -97,21 +82,6 @@ func GenerateZKProof(cs constraint.ConstraintSystem, pk groth16.ProvingKey, cust
 }
 
 // -------------------------- Sha256 Implementation for Circuit ----------------------------
-
-func FixedSizeBytes(input []byte) [DATA_SIZE]byte {
-	var fixed [DATA_SIZE]byte
-
-	if len(input) >= DATA_SIZE {
-		// Input is longer or equal to 128 bytes; take the first 128 bytes
-		copy(fixed[:], input[:DATA_SIZE])
-	} else {
-		// Input is shorter than 128 bytes; copy all bytes and pad with zeros
-		copy(fixed[:], input)
-		// The remaining bytes are already zero-initialized
-	}
-
-	return fixed
-}
 
 var _seed = uints.NewU32Array([]uint32{
 	0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
