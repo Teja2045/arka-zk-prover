@@ -53,7 +53,7 @@ type Circuit struct {
 
 - **Public Variables:** Annotate public variables with the struct tag `` `gnark:",public"` ``.
 - **Variable Types:** Use `frontend.Variable` for all variables.
-- **Naming Convention:** Make sure name the struct Circuit.
+- **Naming Convention:** Make sure name the struct `Circuit`.
 
 ## Defining the CircuitInputs Struct
 
@@ -70,7 +70,7 @@ type CircuitInputs struct {
 - **Field Matching:** Ensure the fields match the variables in the `Circuit` struct.
 - **JSON Tags:** Use JSON tags if you plan to serialize/deserialize the inputs(used for http endpoints).
 - **Data Types:** Choose appropriate data types (e.g., `int`).
-- **Struct Name:** Make sure to the struct `CircuitInputs`.
+- **Struct Name:** Make sure to name the struct `CircuitInputs`.
 
 ## Implementing the Define Method
 
