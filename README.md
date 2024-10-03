@@ -20,7 +20,7 @@ Call zkprover.GenerateCircuit method to generate circuit from .zip file
     }
 ```
 
-**Note:** this method only works if it is being called for the module itself. This package won't work via import.
+**Note:** this method only works if it is being called from the module itself. This package won't work via import.
 To use different circuit, clone the project, replace `circuit/circuit.go` file with your own circuit logic. But make sure to follow the same format. You can refer to [this guide](./docs/01_circuit.md) on how to format the circuit logic.
 
 ### Generate constraint system, prover and verifier keys
