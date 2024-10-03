@@ -12,7 +12,7 @@ import (
 
 func (server *ZKServer) Start() error {
 	http.HandleFunc("/generate-zk-proof", server.handleZKProofRequest)
-	http.HandleFunc("verifier-key", server.handleGetVerifierKeyRequest)
+	http.HandleFunc("/verifier-key", server.handleGetVerifierKeyRequest)
 
 	addr := fmt.Sprintf(":%d", server.Port)
 	log.Printf("Starting server on %s\n", addr)

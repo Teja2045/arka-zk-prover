@@ -41,12 +41,6 @@ func GenerateZKKeys(dir string) error {
 	verifierKeyPath := VerifierKeyPath(dir)
 	csPath := CsPath(dir)
 
-	slog.Info(
-		fmt.Sprintf(
-			"Generating prover key, verifier key and constraint system for circuit",
-		),
-	)
-
 	var circuit Circuit
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {

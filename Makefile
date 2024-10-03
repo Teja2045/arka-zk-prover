@@ -22,4 +22,11 @@ verify-hash-proof:
 	go run cli/hash_proof.go
 
 start-server:
-	go run cli/server.go	
+	go run cli/server.go
+
+start-neural-server:
+	go run cli/server.go -zipfile="example-neural-circuit.zip"
+
+test-neural-server:
+	go run cli/http_check.go
+

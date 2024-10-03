@@ -1,8 +1,6 @@
 package circuit
 
 import (
-	"encoding/binary"
-	"fmt"
 	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc"
@@ -10,51 +8,48 @@ import (
 	"github.com/consensys/gnark/backend/witness"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/std/hash"
-	"github.com/consensys/gnark/std/math/bits"
-	"github.com/consensys/gnark/std/math/bitslice"
 	"github.com/consensys/gnark/std/math/cmp"
-	"github.com/consensys/gnark/std/math/uints"
-	"github.com/consensys/gnark/std/permutation/sha2"
 )
-
-const (
-	DATA_SIZE = 128
-	HASH_SIZE = 32
-)
-
-// var _ hash.BinaryFixedLengthHasher = (*digest)(nil)
-// var _ hash.FieldHasher = (*digest)(nil)
 
 type CircuitInputs struct {
-	Data []byte   `json:"data"`
-	Hash [32]byte `json:"hash"`
+	X []int `json:"input_vector"`
+	W []int `json:"weights"`
+	B int   `json:"bias"`
+	Y int   `json:"output"`
 }
 
 type Circuit struct {
-	In       [DATA_SIZE]uints.U8
-	Expected [HASH_SIZE]uints.U8
+	// Inputs
+	X [2]frontend.Variable `gnark:",public"` // Input vector (public for verification)
+	W [2]frontend.Variable // Weights (private)
+	B frontend.Variable    // Bias (private)
+
+	// Output
+	Y frontend.Variable `gnark:",public"` // Output after activation (public for verification)
 }
 
+// Define declares the circuit's constraints
 func (circuit *Circuit) Define(api frontend.API) error {
-	hFunc, err := New(api)
-	if err != nil {
-		return err
-	}
+	// Compute weighted sum: sum = w0*x0 + w1*x1 + b
+	sum := api.Add(
+		api.Mul(circuit.W[0], circuit.X[0]),
+		api.Mul(circuit.W[1], circuit.X[1]),
+		circuit.B,
+	)
 
-	uapi, err := uints.New[uints.U32](api)
-	if err != nil {
-		return err
-	}
-	hFunc.Write(circuit.In[:])
-	hash := hFunc.Sum()
-	if len(hash) != 32 {
-		return fmt.Errorf("not 32 bytes")
-	}
+	// Implement ReLU activation: y = max(0, sum)
+	// Since we can't have negative numbers in finite fields, we interpret numbers greater than (p-1)/2 as negative.
 
-	for i := range circuit.Expected {
-		uapi.ByteAssertEq(circuit.Expected[i], hash[i])
-	}
+	// Get the modulus of the field
+	modulus := api.Compiler().Field()
+	halfModulus := new(big.Int).Rsh(modulus, 1) // (p - 1) / 2
+
+	isPositive := cmp.IsLess(api, sum, halfModulus)
+
+	y := api.Select(isPositive, sum, 0)
+
+	api.AssertIsEqual(y, circuit.Y)
+
 	return nil
 }
 
@@ -62,20 +57,12 @@ func GenerateZKProof(cs constraint.ConstraintSystem, pk groth16.ProvingKey, cust
 
 	circuitInputs := customInputs.(CircuitInputs)
 
-	resizedData := FixedSizeBytes(circuitInputs.Data)
-	uintsData := uints.NewU8Array(resizedData[:])
-	uintsHash := uints.NewU8Array(circuitInputs.Hash[:])
-
-	var input [DATA_SIZE]uints.U8
-	copy(input[:], uintsData)
-
-	var output [HASH_SIZE]uints.U8
-	copy(output[:], uintsHash)
-
 	// contruct assignment using dynamic veriables
 	assignment := Circuit{
-		In:       input,
-		Expected: output,
+		X: [2]frontend.Variable{circuitInputs.X[0], circuitInputs.X[1]},
+		W: [2]frontend.Variable{circuitInputs.W[0], circuitInputs.W[1]},
+		B: circuitInputs.B,
+		Y: circuitInputs.Y,
 	}
 
 	witness, err := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
@@ -94,171 +81,4 @@ func GenerateZKProof(cs constraint.ConstraintSystem, pk groth16.ProvingKey, cust
 	}
 
 	return zkproof, publicWitness, nil
-}
-
-// -------------------------- Sha256 Implementation for Circuit ----------------------------
-
-func FixedSizeBytes(input []byte) [DATA_SIZE]byte {
-	var fixed [DATA_SIZE]byte
-
-	if len(input) >= DATA_SIZE {
-		// Input is longer or equal to 128 bytes; take the first 128 bytes
-		copy(fixed[:], input[:DATA_SIZE])
-	} else {
-		// Input is shorter than 128 bytes; copy all bytes and pad with zeros
-		copy(fixed[:], input)
-		// The remaining bytes are already zero-initialized
-	}
-
-	return fixed
-}
-
-var _seed = uints.NewU32Array([]uint32{
-	0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
-})
-
-type digest struct {
-	api  frontend.API
-	uapi *uints.BinaryField[uints.U32]
-	in   []uints.U8
-}
-
-func New(api frontend.API) (hash.BinaryFixedLengthHasher, error) {
-	uapi, err := uints.New[uints.U32](api)
-	if err != nil {
-		return nil, err
-	}
-	return &digest{api: api, uapi: uapi}, nil
-}
-
-func (d *digest) Write(data []uints.U8) {
-	d.in = append(d.in, data...)
-}
-
-func (d *digest) padded(bytesLen int) []uints.U8 {
-	zeroPadLen := 55 - bytesLen%64
-	if zeroPadLen < 0 {
-		zeroPadLen += 64
-	}
-	if cap(d.in) < len(d.in)+9+zeroPadLen {
-		// in case this is the first time this method is called increase the
-		// capacity of the slice to fit the padding.
-		d.in = append(d.in, make([]uints.U8, 9+zeroPadLen)...)
-		d.in = d.in[:len(d.in)-9-zeroPadLen]
-	}
-	buf := d.in
-	buf = append(buf, uints.NewU8(0x80))
-	buf = append(buf, uints.NewU8Array(make([]uint8, zeroPadLen))...)
-	lenbuf := make([]uint8, 8)
-	binary.BigEndian.PutUint64(lenbuf, uint64(8*bytesLen))
-	buf = append(buf, uints.NewU8Array(lenbuf)...)
-	return buf
-}
-
-func (d *digest) Sum() []uints.U8 {
-	var runningDigest [8]uints.U32
-	var buf [64]uints.U8
-	copy(runningDigest[:], _seed)
-	padded := d.padded(len(d.in))
-	for i := 0; i < len(padded)/64; i++ {
-		copy(buf[:], padded[i*64:(i+1)*64])
-		runningDigest = sha2.Permute(d.uapi, runningDigest, buf)
-	}
-	var ret []uints.U8
-	for i := range runningDigest {
-		ret = append(ret, d.uapi.UnpackMSB(runningDigest[i])...)
-	}
-	return ret
-}
-
-func (d *digest) FixedLengthSum(length frontend.Variable) []uints.U8 {
-	// we need to do two things here -- first the padding has to be put to the
-	// right place. For that we need to know how many blocks we have used. We
-	// need to fit at least 9 more bytes (padding byte and 8 bytes for input
-	// length). Knowing the block, we have to keep running track if the current
-	// block is the expected one.
-	//
-	// idea - have a mask for blocks where 1 is only for the block we want to
-	// use.
-
-	data := make([]uints.U8, len(d.in))
-	copy(data, d.in)
-
-	comparator := cmp.NewBoundedComparator(d.api, big.NewInt(int64(len(data)+64+8)), false)
-
-	for i := 0; i < 64+8; i++ {
-		data = append(data, uints.NewU8(0))
-	}
-
-	lenMod64 := d.mod64(length)
-	lenMod64Less56 := comparator.IsLess(lenMod64, 56)
-
-	paddingCount := d.api.Sub(64, lenMod64)
-	paddingCount = d.api.Select(lenMod64Less56, paddingCount, d.api.Add(paddingCount, 64))
-
-	totalLen := d.api.Add(length, paddingCount)
-	last8BytesPos := d.api.Sub(totalLen, 8)
-
-	var dataLenBtyes [8]frontend.Variable
-	d.bigEndianPutUint64(dataLenBtyes[:], d.api.Mul(length, 8))
-
-	for i := range data {
-		isPaddingStartPos := d.api.IsZero(d.api.Sub(i, length))
-		data[i].Val = d.api.Select(isPaddingStartPos, 0x80, data[i].Val)
-
-		isPaddingPos := comparator.IsLess(length, i)
-		data[i].Val = d.api.Select(isPaddingPos, 0, data[i].Val)
-	}
-
-	for i := range data {
-		isLast8BytesPos := d.api.IsZero(d.api.Sub(i, last8BytesPos))
-		for j := 0; j < 8; j++ {
-			if i+j < len(data) {
-				data[i+j].Val = d.api.Select(isLast8BytesPos, dataLenBtyes[j], data[i+j].Val)
-			}
-		}
-	}
-
-	var runningDigest [8]uints.U32
-	var resultDigest [8]uints.U32
-	var buf [64]uints.U8
-	copy(runningDigest[:], _seed)
-	copy(resultDigest[:], _seed)
-
-	for i := 0; i < len(data)/64; i++ {
-		copy(buf[:], data[i*64:(i+1)*64])
-		runningDigest = sha2.Permute(d.uapi, runningDigest, buf)
-
-		isInRange := comparator.IsLess(i*64, totalLen)
-
-		for j := 0; j < 8; j++ {
-			for k := 0; k < 4; k++ {
-				resultDigest[j][k].Val = d.api.Select(isInRange, runningDigest[j][k].Val, resultDigest[j][k].Val)
-			}
-		}
-	}
-
-	var ret []uints.U8
-	for i := range resultDigest {
-		ret = append(ret, d.uapi.UnpackMSB(resultDigest[i])...)
-	}
-	return ret
-}
-
-func (d *digest) Reset() {
-	d.in = nil
-}
-
-func (d *digest) Size() int { return 32 }
-
-func (d *digest) mod64(v frontend.Variable) frontend.Variable {
-	lower, _ := bitslice.Partition(d.api, v, 6, bitslice.WithNbDigits(64))
-	return lower
-}
-
-func (d *digest) bigEndianPutUint64(b []frontend.Variable, x frontend.Variable) {
-	bts := bits.ToBinary(d.api, x, bits.WithNbDigits(64))
-	for i := 0; i < 8; i++ {
-		b[i] = bits.FromBinary(d.api, bts[(8-i-1)*8:(8-i)*8])
-	}
 }
