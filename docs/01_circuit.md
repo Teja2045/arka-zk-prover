@@ -2,6 +2,8 @@
 Follow the below format of defining circuit to maker sure the other apis defined in the module packages can be used seamlessly.
 
 **Note:** Make sure to `circuit.go` as the file to be consistent with zipping and unzipping compression logic used in the module.
+
+
 **Table of Contents**
 
 1. [Introduction](#introduction)
