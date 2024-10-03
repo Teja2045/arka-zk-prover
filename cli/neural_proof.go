@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"log"
 
 	zkprover "github.com/arka-labs/zk-prover"
@@ -19,12 +18,10 @@ func main() {
 	// circuitInputs.Y = 2
 	// circuitInputs.Z = 3
 
-	data := []byte("good data very good data")
-
-	digest := sha256.Sum256(data)
-
-	circuitInputs.Data = data
-	circuitInputs.Hash = digest
+	circuitInputs.X = []int{3, 4}
+	circuitInputs.W = []int{2, -1}
+	circuitInputs.B = 1
+	circuitInputs.Y = 3
 
 	validityProof, err := zkprover.GetZKProof(circuitInputs, DIR_1)
 	if err != nil {
